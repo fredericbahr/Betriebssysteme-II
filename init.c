@@ -20,17 +20,15 @@ void parse_arguments(int argc, char **argv)
 	char c;
 	long tmp;
 
-	while ((c = getopt(argc, argv, "ht:u:bm:")) != -1)
+	while ((c = getopt(argc, argv, "ht:u:b")) != -1)
 		switch (c) {
 		case 't':
 			{
 				assert(optarg);
 				tmp = atoll(optarg);
-				if (tmp > 5000) {
+				if (tmp > 5000)
 					handle.web_portnummer =
 					    (unsigned short int)tmp % 65535;
-					syslog_x(LOG_INFO, "New Wep Portnumber: %d\n", handle.web_portnummer);
-				}
 				else
 					syslog_x(LOG_CRIT,
 						 "web_portnumber remains %d (%d not allowed)\n",
@@ -41,11 +39,9 @@ void parse_arguments(int argc, char **argv)
 			{
 				assert(optarg);
 				tmp = atoll(optarg);
-				if (tmp > 5000) {
+				if (tmp > 5000)
 					handle.udp_portnummer =
 					    (unsigned short int)tmp % 65535;
-					syslog_x(LOG_INFO, "New UPD Portnumber: %d\n", handle.udp_portnummer);
-				}
 				else
 					syslog_x(LOG_CRIT,
 						 "udp_portnumber remains %d (%d not allowed)\n",
@@ -56,13 +52,6 @@ void parse_arguments(int argc, char **argv)
       ///todo set flag - daemon shall NOT run in CONSOLE but in BACKGROUND
       break;
     }
-
-	case 'm': {
-			assert(optarg);
-			handle.secret = atoll(optarg);
-			syslog_x(LOG_INFO, "Secret key is: %d\n", handle.secret);
-			break;
-	}
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -142,11 +131,11 @@ int init_everything(int argc, char **argv)
 	// set no zero values to "not inited" == -1
 	handle.web_server_socket = -1;
 	handle.udp_peer_socket = -1;
-  	// set std port numbers
-  	handle.web_portnummer = 24473;
+  // set std port numbers
+  handle.web_portnummer = 24473;
 	handle.udp_portnummer = 24473;
 
-	parse_arguments(argc, argv); // <-- eventualy override port numbers etc.
+  parse_arguments(argc, argv); // <-- eventualy override port numbers etc.
 	
 	/* register cleanup function */
 	atexit(cleanup);
