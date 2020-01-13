@@ -63,14 +63,29 @@ int worker_new_udp_request()
 	return retval;
 }
 
-static int setup_client (key_t key, int flag) {
-   	int res;
-   	res = msgget (key, flag);
-   	if (res == -1) {
-    	printf ("Client-Fehler beim Einrichten der Message Queues...\n");
-    	return -1;
-   }
-   return res;
+/*
+ * 
+ * */
+int sende_lsp(char *dest)
+{
+	ssize_t retval = 0;
+	socklen_t len;
+	struct sockaddr_in clientinfo;
+	char buffer[BUFFERSIZE+1];
+
+
+	clientinfo.sin_family = AF_INET;
+	clientinfo.sin_addr.s_addr = inet_addr(dest);	//htonl (INADDR_ANY);
+	clientinfo.sin_port = htons(handle.udp_portnummer);
+
+	// sende LSP an angegebene IP-Addresse
+	retval = sendto (handle.udp_peer_socket, buffer, 1+ retval , 0, 
+                    (struct sockaddr *) &clientinfo, sizeof (clientinfo));
+	if (1 > retval) {
+		syslog_x(LOG_CRIT, "returning msg not successfull udp_peer\n");
+		return -1;
+	} 
+	return 0;
 }
 
 int worker() {
