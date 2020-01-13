@@ -3,7 +3,6 @@
 #include <syslog.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ipc.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,18 +17,6 @@
 #include "signale/signale.h"
 
 #define BUFFERSIZE 1500
-#define PERM 066
-#define MSG_LEN 1024
-
-typedef struct {
-   long prioritaet;
-   char message[MSG_LEN];
-} client2server;
-
-typedef struct {
-   long prioritaet;
-   char message[MSG_LEN];
-} server2client;
 
 struct handle_struct{
 	unsigned short int web_portnummer;
@@ -39,7 +26,6 @@ struct handle_struct{
 	char lastmsg[BUFFERSIZE];
 	fd_set rfds;
     int max_socket;
-	unsigned short int secret;
 };
 struct handle_struct handle;
 
@@ -51,8 +37,4 @@ void cleanup(void);
 
 /* worker.c functions */
 int worker();
-
-static int setup_client (key_t key, int flag);
-
-static int setup_server( key_t key, int flag );
 
