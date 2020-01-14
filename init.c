@@ -1,6 +1,9 @@
 #include <assert.h>
 #include "project.h"
 #define LOCAL_SERVER_PORT 1234
+
+int ende = 1;
+
 void show_help(char *name)
 {
 	fprintf(stderr,"Usage HINTS for %s\n", name);
@@ -100,8 +103,7 @@ int udp_init_socket() {
 	int retval = 0;
 	int n;
 	int flag = 1;
-
-	char puffer[255];
+	char puffer[BUFFERSIZE];
 	
 
 	//socket erzeugen
@@ -138,29 +140,37 @@ int udp_init_socket() {
 	}
 
 
-	syslog_x(LOG_INFO, "Komme in Endlosschleife\n");
 	// 1 muss durch variable ersetz werden, sodass mit STR+C abgebrochen werden kann
-	while (1) {
+	signal(SIGINT, beendeServer);
+	while (ende) {
 		/* Puffer initialisieren */
-		memset (puffer, 0, 255);
+		memset (puffer, 0, BUFFERSIZE);
 		/* Nachrichten empfangen */
 		len = sizeof (clientinfo);
-		n = recvfrom ( handle.udp_peer_socket, puffer, 255, 0, (struct sockaddr *) &clientinfo, &len );
-		syslog_x(LOG_INFO, "n ist: %d\n",n);
+		n = recvfrom ( handle.udp_peer_socket, puffer, BUFFERSIZE, 0, (struct sockaddr *) &clientinfo, &len );
 		if (n < 0) {
 		   printf ("Kann keine Daten empfangen ...\n");
 		   continue;
 		}
-		syslog_x(LOG_INFO, "Möchte Daten ausgeben\n");
+
 		/* Erhaltene Nachricht ausgeben */
 		//Speichere IP-Addressen in struct
-		syslog_x(LOG_INFO, "Daten erhalten von %s:UDP%u : %s \n", inet_ntoa (clientinfo.sin_addr),
+		syslog_x(LOG_INFO, "Daten erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
 				ntohs (clientinfo.sin_port), puffer);
+
+		//Sende bestätigung an Client
+		syslog_x(LOG_INFO, "Sende bestätigung an Client.\n");
+		n = sendto (handle.udp_peer_socket, "Habe deine Daten erhalten.", strlen("Habe deine Daten erhalten.\n"), 0, (struct sockaddr *) &clientinfo, sizeof (clientinfo));
+		if(n < 0) {
+			syslog_x(LOG_CRIT, "Konnte keine Bestätigungsnachricht schicken.\n");
+		}
 	}
-	syslog_x(LOG_INFO, "Ende\n");
 	return retval;
 }
 
+void beendeServer(int sig) {
+		exit(EXIT_SUCCESS);
+}
 
 int init_everything(int argc, char **argv)
 {

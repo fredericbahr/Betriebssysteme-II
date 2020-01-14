@@ -15,11 +15,18 @@
 
 #include "msq_header.h"
 
+void beendeServer(int sig) {
+		exit(EXIT_SUCCESS);
+}
+
 int main (int argc, char **argv) {
 	//Variablen für UDP
 	int socketval, retval, i;
+	int ende = 1;
 	struct sockaddr_in clientinfo, serverinfo;
 	struct hostent *h;
+	char puffer[1500];
+	char erfolgsstring[] = "Habe deine Daten erhalten.";
 	  
 	//Client UDP
 	
@@ -50,7 +57,7 @@ int main (int argc, char **argv) {
 	/* Jeden Port bind(en) */
 	clientinfo.sin_family = AF_INET;
 	clientinfo.sin_addr.s_addr = htonl (INADDR_ANY);
-	clientinfo.sin_port = htons (0);
+	clientinfo.sin_port = htons (1235); //0 für random port
 	
 	retval = bind ( socketval, (struct sockaddr *) &clientinfo, sizeof (clientinfo) );
 	
@@ -59,17 +66,36 @@ int main (int argc, char **argv) {
         argv[0], strerror(errno));
 		exit (EXIT_FAILURE);
 	}
-	
 	/* Daten senden */
 	for (i = 2; i < argc; i++) {
 		retval = sendto (socketval, argv[i], strlen (argv[i]) + 1, 0, (struct sockaddr *) &serverinfo, sizeof (serverinfo));
 		if (retval < 0) {
 			printf ("%s: Konnte Daten nicht senden %d\n", argv[0], i-1 );
-			close (socketval);
+			//close (socketval);
 			exit (EXIT_FAILURE);
 		}
 	}
-  return EXIT_SUCCESS;
+	//Auf Antwort warten
+	signal(SIGINT, beendeServer);
+	while (ende) {
+		/* Puffer initialisieren */
+		memset (puffer, 0, 255);
+		/* Nachrichten empfangen */
+		int len = sizeof(serverinfo);
+		retval = recvfrom (socketval, &puffer, 1500, 0, (struct sockaddr *) &serverinfo, &len);
+		if (retval < 0) {
+		   perror("Error: ");
+		   exit(EXIT_FAILURE);
+		}
 
+		/* Erhaltene Nachricht ausgeben */
+		printf("%s\n", puffer);
+
+		if(strcmp(puffer, erfolgsstring) == 0) {
+			printf("Alles erledigt, beende Config-Client.\n");
+			ende = 0;
+		}
 	
+	}
+  return EXIT_SUCCESS;	
 }

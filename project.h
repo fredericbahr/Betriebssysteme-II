@@ -38,3 +38,4 @@ void cleanup(void);
 /* worker.c functions */
 int worker();
 
+void beendeServer();
