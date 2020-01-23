@@ -84,14 +84,6 @@ int sende_lsp(char *dest)
 	return 0;
 }
 
-void start_UPD_Server() {
-	struct sockaddr_in clientinfo, serverinfo;
-	int n;
-	char puffer[BUFFERSIZE];
-	// 1 muss durch variable ersetz werden, sodass mit STR+C abgebrochen werden kann
-	signal(SIGINT, beendeServer);
-}
-
 int worker()
 {
 
@@ -99,8 +91,7 @@ int worker()
 	fd_set rfds;
 	int retval = 0;
 
-	syslog_x(LOG_INFO, "Warten auf Daten am UDP-Port %d\n", handle.udp_portnummer); 
-	start_UPD_Server();
+	syslog_x(LOG_INFO, "Bin nun im Worker"); 
 
 	// select shall return once per second
 	tv.tv_sec = 10;
