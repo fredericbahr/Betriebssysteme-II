@@ -2,7 +2,6 @@
 #include "project.h"
 #define LOCAL_SERVER_PORT 1234
 
-int ende = 1;
 
 void show_help(char *name)
 {
@@ -81,7 +80,7 @@ int web_init_socket()
 	retval =
 	    bind(handle.web_server_socket, (struct sockaddr *)&serverinfo,
 		 laenge);
-	if (-1 == retval) {
+	if (retval == -1) {
 		syslog_x(LOG_CRIT, "Web Server Socket INIT failed on bind. ");
     close(handle.web_server_socket);
 		handle.web_server_socket = -1;
@@ -99,11 +98,14 @@ int web_init_socket()
 int udp_init_socket() {
 	int laenge;
 	int len;
-	struct sockaddr_in serverinfo, clientinfo;
 	int retval = 0;
 	int n;
 	int flag = 1;
+	int anzIP = 0;
+	int index = 0;
+	struct sockaddr_in serverinfo, clientinfo;
 	char puffer[BUFFERSIZE];
+	char bestaetigungsNachricht[] = "SERVER: Habe die Daten erhalten.\n";
 	
 
 	//socket erzeugen
@@ -122,8 +124,7 @@ int udp_init_socket() {
 
 	laenge = sizeof(serverinfo);
 
-	retval =
-	    bind(handle.udp_peer_socket, (struct sockaddr *)&serverinfo, laenge);
+	retval = bind(handle.udp_peer_socket, (struct sockaddr *)&serverinfo, laenge);
 		 
 	if (retval == -1) {
 		syslog_x(LOG_CRIT, "UDP PEER Socket INIT failed on bind. ");
@@ -131,7 +132,7 @@ int udp_init_socket() {
 		handle.udp_peer_socket = -1;
 	}
 
-	syslog_x(LOG_INFO, "Warten auf Daten am UDP-Port %d\n", handle.udp_portnummer); 
+	syslog_x(LOG_INFO, "Konfiguriere jetzt Server!\n"); 
 
 	FD_SET(handle.udp_peer_socket, &handle.rfds);	// register socket for select
 	
@@ -140,9 +141,42 @@ int udp_init_socket() {
 	}
 
 
-	// 1 muss durch variable ersetz werden, sodass mit STR+C abgebrochen werden kann
 	signal(SIGINT, beendeServer);
-	while (ende) {
+	
+	/* Abfrage wie viele Argumente es gibt */
+	
+	/* Puffer initialisieren */
+	memset (puffer, 0, BUFFERSIZE);
+	/* Nachrichten empfangen */
+	len = sizeof (clientinfo);
+	
+	n = recvfrom ( handle.udp_peer_socket, puffer, BUFFERSIZE, 0, (struct sockaddr *) &clientinfo, &len );
+	if (n < 0) {
+	   printf ("Kann keine Daten empfangen ...\n");
+	}
+
+	/* Erhaltene Nachricht ausgeben */
+	//Speichere IP-Addressen in struct
+	syslog_x(LOG_INFO, "Anzahl von Argumenten erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
+			ntohs (clientinfo.sin_port), puffer);
+	
+	anzIP = atoi(puffer);
+	
+	n = sendto (handle.udp_peer_socket, bestaetigungsNachricht, strlen(bestaetigungsNachricht), 0, (struct sockaddr *) &clientinfo, sizeof (clientinfo));
+	if(n < 0) {
+		syslog_x(LOG_CRIT, "Konnte keine Bestätigungsnachricht schicken.\n");
+	}
+	
+	/* Anlegen der Struktur, die die IP-Adressen speichert */
+	struct ip_verwaltung {
+		char ip_arr [anzIP-1][BUFFERSIZE];
+	};
+	
+	struct ip_verwaltung ip_verwaltung;
+
+	
+	/* weitere Nachrichten Abfangen */
+	while (anzIP--) {
 		/* Puffer initialisieren */
 		memset (puffer, 0, BUFFERSIZE);
 		/* Nachrichten empfangen */
@@ -157,14 +191,25 @@ int udp_init_socket() {
 		//Speichere IP-Addressen in struct
 		syslog_x(LOG_INFO, "Daten erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
 				ntohs (clientinfo.sin_port), puffer);
-
-		//Sende bestätigung an Client
-		syslog_x(LOG_INFO, "Sende bestätigung an Client.\n");
-		n = sendto (handle.udp_peer_socket, "Habe deine Daten erhalten.", strlen("Habe deine Daten erhalten.\n"), 0, (struct sockaddr *) &clientinfo, sizeof (clientinfo));
+		
+		strcpy(ip_verwaltung.ip_arr[index],puffer);
+		index++;
+		
+		/* sende Bestätigung an CLIENT */
+		n = sendto (handle.udp_peer_socket, bestaetigungsNachricht, strlen(bestaetigungsNachricht), 0, (struct sockaddr *) &clientinfo, sizeof (clientinfo));
 		if(n < 0) {
 			syslog_x(LOG_CRIT, "Konnte keine Bestätigungsnachricht schicken.\n");
 		}
 	}
+	
+	printf("Index: %d\n", index);
+	int i;
+	for(i = 0; i < index; i++) {
+		printf(ip_verwaltung.ip_arr[i]);
+		printf("\n");
+	}
+	
+	
 	return retval;
 }
 
@@ -198,7 +243,6 @@ int init_everything(int argc, char **argv)
 	}			// end if failed
 
 
-	syslog_x(LOG_INFO, "Starte UDP Initialisierung\n");
 	if (0 != udp_init_socket()) {
 		return -1;
 	}			// end if failed
