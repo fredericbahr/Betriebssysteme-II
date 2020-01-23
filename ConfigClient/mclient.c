@@ -26,7 +26,8 @@ int main (int argc, char **argv) {
 	struct sockaddr_in clientinfo, serverinfo;
 	struct hostent *h;
 	char puffer[1500];
-	char erfolgsstring[] = "Habe deine Daten erhalten.";
+	int anzArgumente;
+	char strAnzArgumente[10];
 	  
 	//Client UDP
 	
@@ -41,7 +42,6 @@ int main (int argc, char **argv) {
 		printf ("%s: unbekannter Host '%s' \n", argv[0], argv[1] );
 		exit (EXIT_FAILURE);
 	}
-	printf ("%s: sende Daten an '%s' (IP : %s) \n", argv[0], h->h_name, inet_ntoa (*(struct in_addr *) h->h_addr_list[0]) );
 	
 	serverinfo.sin_family = h->h_addrtype;
 	memcpy ( (char *) &serverinfo.sin_addr.s_addr, h->h_addr_list[0], h->h_length);
@@ -66,6 +66,12 @@ int main (int argc, char **argv) {
         argv[0], strerror(errno));
 		exit (EXIT_FAILURE);
 	}
+	
+	/* Anzahl an Argumenten übersenden */
+	anzArgumente = argc -2;
+	sprintf(strAnzArgumente, "%d", anzArgumente); 
+	retval = sendto (socketval, strAnzArgumente, strlen(strAnzArgumente), 0, (struct sockadrr *) &serverinfo, sizeof(serverinfo));
+	
 	/* Daten senden */
 	for (i = 2; i < argc; i++) {
 		retval = sendto (socketval, argv[i], strlen (argv[i]) + 1, 0, (struct sockaddr *) &serverinfo, sizeof (serverinfo));
@@ -75,6 +81,7 @@ int main (int argc, char **argv) {
 			exit (EXIT_FAILURE);
 		}
 	}
+	
 	//Auf Antwort warten
 	signal(SIGINT, beendeServer);
 	while (ende) {
@@ -82,19 +89,16 @@ int main (int argc, char **argv) {
 		memset (puffer, 0, 255);
 		/* Nachrichten empfangen */
 		int len = sizeof(serverinfo);
+		
 		retval = recvfrom (socketval, &puffer, 1500, 0, (struct sockaddr *) &serverinfo, &len);
+		
 		if (retval < 0) {
 		   perror("Error: ");
 		   exit(EXIT_FAILURE);
 		}
 
 		/* Erhaltene Nachricht ausgeben */
-		printf("%s\n", puffer);
-
-		if(strcmp(puffer, erfolgsstring) == 0) {
-			printf("Alles erledigt, beende Config-Client.\n");
-			ende = 0;
-		}
+		printf("%s", puffer);
 	
 	}
   return EXIT_SUCCESS;	
