@@ -29,8 +29,7 @@ int worker_new_web_request()
 /*
  * test with nc -u 127.0.0.1 24473
  * */
-int worker_new_udp_request()
-{
+int worker_new_udp_request() {
 	ssize_t retval = 0;
 	socklen_t len;
 	struct sockaddr_in clientinfo;
@@ -47,7 +46,7 @@ int worker_new_udp_request()
 		buffer[1+retval]=0;
 		memcpy(handle.lastmsg,buffer,1+retval);
 	}	
-  
+
 	// echo that
 	syslog_x(LOG_INFO, buffer);
 	retval = sendto (handle.udp_peer_socket, buffer, 1+ retval , 0, (struct sockaddr *) &clientinfo, sizeof (clientinfo)); 
@@ -62,50 +61,94 @@ int worker_new_udp_request()
 /*
  * 
  * */
-int sende_lsp(char *dest)
+int sende_lsp(char *dest, unsigned short int port, char *nachricht)
 {
-	ssize_t retval = 0;
+	int retval = 0;
 	socklen_t len;
 	struct sockaddr_in clientinfo;
-	char buffer[BUFFERSIZE+1];
-
+	char buffer[BUFFERSIZE];
 
 	clientinfo.sin_family = AF_INET;
 	clientinfo.sin_addr.s_addr = inet_addr(dest);	//htonl (INADDR_ANY);
-	clientinfo.sin_port = htons(handle.udp_portnummer);
+	clientinfo.sin_port = htons(port);
 
 	// sende LSP an angegebene IP-Addresse
-	retval = sendto (handle.udp_peer_socket, buffer, 1+ retval , 0, 
+	retval = sendto (handle.udp_peer_socket, nachricht, strlen(nachricht) , 0, 
                     (struct sockaddr *) &clientinfo, sizeof (clientinfo));
-	if (1 > retval) {
-		syslog_x(LOG_CRIT, "returning msg not successfull udp_peer\n");
+	if (retval < 1) {
+		syslog_x(LOG_CRIT, "Konnte keine Nachricht an die jeweilige Adresse %s:%s senden\n", dest, port);
 		return -1;
 	} 
 	return 0;
 }
 
-int sendInitialLSP() {
+char * readWholeFile() {
 	FILE *fp;
-	fp = fopen("ip.txt", "r");
+	long fsize;
+	char * nachricht;
+
+	fp = fopen(handle.path,"r");
+
+	fseek(fp, 0, SEEK_END);
+	fsize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+
+	nachricht = malloc(fsize + 1);
+	fread(nachricht, 1, fsize, fp);
+
+	return nachricht;
+}
+
+void sendInitialLSP() {
+	FILE *fp;
 	char puffer[100];
-	int n;
-	
-	while (fgets(puffer, 100, fp))
+	char ip[100];
+	char port[100];
+	int dontSendFirstLine = 1;
+	char *nachricht;
+
+	nachricht = readWholeFile();
+
+	fp = fopen(handle.path, "r");
+
+	while (fscanf(fp, "%[^:]%*c%[^\n]%*c", ip, port) != EOF)
 	{
-		sende_lsp(puffer);
+		if(!(dontSendFirstLine >= 1)) {
+			sende_lsp(ip, atoi(port), nachricht);
+		}
+		else
+		{
+			dontSendFirstLine--;
+		}
+		
 	}
 	
 }
 
+getMessages() {
+	struct sockaddr_in neighborinfo, serverinfo;
+	int n, len;
+	char puffer[BUFFERSIZE];
+
+	serverinfo.sin_family = AF_INET;
+	serverinfo.sin_addr.s_addr = htonl(INADDR_ANY);	// all network interfaces
+	serverinfo.sin_port = htons(handle.udp_portnummer);
+
+	len = sizeof (neighborinfo);
+
+	n = recvfrom ( handle.udp_peer_socket, puffer, BUFFERSIZE, 0, (struct sockaddr *) &neighborinfo, &len );
+
+	syslog_x(LOG_INFO, "Nachricht:\n%swurde von %s an Port %u erhalten.\n",
+	puffer, inet_ntoa(neighborinfo.sin_addr), ntohs(neighborinfo.sin_port));
+}
+
 int worker()
 {
-
 	struct timeval tv;
 	fd_set rfds;
 	int retval = 0;
-	
 	// select shall return once per second
-	tv.tv_sec = 10;
+	tv.tv_sec = 100;
 	tv.tv_usec = 0;
 	// copy global bitvector into local copy
 	memcpy(&rfds, &handle.rfds, sizeof(fd_set));
@@ -121,8 +164,9 @@ int worker()
 			retval = worker_new_udp_request();
 		} // end if udp_peer
 
-
-	}			// end if retval
+	}		// end if retval
 //fprintf(stderr,"worker leaving %d\n",retval);
+
+
 	return retval;
 }
