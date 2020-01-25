@@ -26,6 +26,7 @@ struct handle_struct{
 	char lastmsg[BUFFERSIZE];
 	fd_set rfds;
     int max_socket;
+	char * path;
 };
 struct handle_struct handle;
 
