@@ -10,10 +10,13 @@ int main(int argc, char **argv){
 	syslog_x(LOG_NOTICE, "Daemon gestartet. PID: %d\n", getpid());
 
 // START WORKING
+	sleep(5);
+	sendInitialLSP();
+	getMessages();
 	do {
 
 		// call functions
-		worker();
+		//worker();
 
 	} while ((1 == get_sigint_state()) && (1 == get_sigterm_state()));
 
