@@ -84,15 +84,26 @@ int sende_lsp(char *dest)
 	return 0;
 }
 
+int sendInitialLSP() {
+	FILE *fp;
+	fp = fopen("ip.txt", "r");
+	char puffer[100];
+	int n;
+	
+	while (fgets(puffer, 100, fp))
+	{
+		sende_lsp(puffer);
+	}
+	
+}
+
 int worker()
 {
 
 	struct timeval tv;
 	fd_set rfds;
 	int retval = 0;
-
-	syslog_x(LOG_INFO, "Bin nun im Worker"); 
-
+	
 	// select shall return once per second
 	tv.tv_sec = 10;
 	tv.tv_usec = 0;
@@ -110,9 +121,6 @@ int worker()
 			retval = worker_new_udp_request();
 		} // end if udp_peer
 
-    /* 
-     * Implement MSG_QUEUE here to control DAEMON per
-     * */
 
 	}			// end if retval
 //fprintf(stderr,"worker leaving %d\n",retval);
