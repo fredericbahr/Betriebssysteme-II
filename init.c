@@ -10,10 +10,11 @@
 void show_help(char *name)
 {
 	fprintf(stderr,"Usage HINTS for %s\n", name);
-  fprintf(stderr,"%s -t 24473 -u 24473 -b -m 24473\n", name);
+  fprintf(stderr,"%s -t 24473 -u 24473 -b -m 24473 -p ip.txt\n", name);
   fprintf(stderr,"-t <ushort>: portnumber for tcp socket \n");
   fprintf(stderr,"-u <ushort>: portnumber for udp socket \n");
   fprintf(stderr,"-b : start as daemon - not implemented\n");
+  fprintf(stderr,"-p : path for the file, where LSP are saved\n");
   fprintf(stderr,"-m <ushort>: secret for msg/unix domain socket queue - not implemented \n");
   fprintf(stderr,"\n to test:\n open second console and execute\n");
   fprintf(stderr,"\t nc 127.0.0.1 24473 # to connect to tcp socket\n");
