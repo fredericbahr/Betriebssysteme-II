@@ -11,12 +11,10 @@
 #include <sys/time.h>
 #include <errno.h>
 
-#define SERVER_PORT 1234
-
 #include "msq_header.h"
 
-void beendeServer(int sig) {
-		exit(EXIT_SUCCESS);
+void beende(int sig) {
+		exit(EXIT_FAILURE);
 }
 
 int main (int argc, char **argv) {
@@ -28,6 +26,7 @@ int main (int argc, char **argv) {
 	char puffer[1500];
 	int anzArgumente;
 	char strAnzArgumente[10];
+	unsigned short int port;
 	  
 	//Client UDP
 	
@@ -43,9 +42,11 @@ int main (int argc, char **argv) {
 		exit (EXIT_FAILURE);
 	}
 	
+	port = atoi(argv[2]);
+
 	serverinfo.sin_family = h->h_addrtype;
 	memcpy ( (char *) &serverinfo.sin_addr.s_addr, h->h_addr_list[0], h->h_length);
-	serverinfo.sin_port = htons (SERVER_PORT);
+	serverinfo.sin_port = htons (port);
 	
 	/* Socket erzeugen */
 	socketval = socket (AF_INET, SOCK_DGRAM, 0);
@@ -57,7 +58,7 @@ int main (int argc, char **argv) {
 	/* Jeden Port bind(en) */
 	clientinfo.sin_family = AF_INET;
 	clientinfo.sin_addr.s_addr = htonl (INADDR_ANY);
-	clientinfo.sin_port = htons (1235); //0 für random port
+	clientinfo.sin_port = htons (0); //0 für random port
 	
 	retval = bind ( socketval, (struct sockaddr *) &clientinfo, sizeof (clientinfo) );
 	
@@ -68,12 +69,12 @@ int main (int argc, char **argv) {
 	}
 	
 	/* Anzahl an Argumenten übersenden */
-	anzArgumente = argc -2;
+	anzArgumente = argc - 3;
 	sprintf(strAnzArgumente, "%d", anzArgumente); 
 	retval = sendto (socketval, strAnzArgumente, strlen(strAnzArgumente), 0, (struct sockadrr *) &serverinfo, sizeof(serverinfo));
 	
 	/* Daten senden */
-	for (i = 2; i < argc; i++) {
+	for (i = 3; i < argc; i++) {
 		retval = sendto (socketval, argv[i], strlen (argv[i]) + 1, 0, (struct sockaddr *) &serverinfo, sizeof (serverinfo));
 		if (retval < 0) {
 			printf ("%s: Konnte Daten nicht senden %d\n", argv[0], i-1 );
@@ -83,7 +84,7 @@ int main (int argc, char **argv) {
 	}
 	
 	//Auf Antwort warten
-	signal(SIGINT, beendeServer);
+	signal(SIGINT, beende);
 	while (ende) {
 		/* Puffer initialisieren */
 		memset (puffer, 0, 255);
