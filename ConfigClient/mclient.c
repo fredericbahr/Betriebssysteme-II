@@ -17,6 +17,21 @@ void beende(int sig) {
 		exit(EXIT_FAILURE);
 }
 
+void show_help(char *name)
+{
+	fprintf(stderr,"Usage HINTS for %s\n", name);
+    fprintf(stderr,"%s 127.0.0.1:24473 141.57.9.22:24474 141.57.9.33:24475 \n", name);
+	fprintf(stderr,"Der Aufbau der Argumente ist relative einfach.\n");
+	fprintf(stderr,"Sie folgen der Form ip_adresse:portnummer.\n");
+	fprintf(stderr,"Das erste Argument ist für den interen Server-Sockeet gedacht, ");
+	fprintf(stderr,"daher sollte dieser immer die IP-Adresse des localhsot haben.\n");
+	fprintf(stderr,"Die anderen Argumente beziehen sich auf die Nachbarn, mit denen sich verbunden werden soll. \n");
+	fprintf(stderr,"Es muss sichergestellt sein, dass wenn auf dem selben Rechner gestartet wird, ");
+	fprintf(stderr,"die Portnummer beim Server sowie hier richtig angeben wird und die IP-Adresse dem localhost entspricht.\n");
+	exit(0);
+}
+
+
 int main (int argc, char **argv) {
 	//Variablen für UDP
 	int socketval, retval, i;
@@ -33,7 +48,7 @@ int main (int argc, char **argv) {
 	/* Kommandozeile auswerten */
 	if(argc < 3) {
 		printf ("Sie müssen mindestens eine IP-Addresse Ihres Nachbarns angeben\n");
-		exit (EXIT_FAILURE);
+		showhelp(argv[0]);
 	}
 	/* IP-Adresse vom Server überprüfen */
 	h = gethostbyname (argv[1]);
