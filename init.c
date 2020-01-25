@@ -6,8 +6,6 @@
 #include <sys/socket.h> 
 #include <netinet/in.h> 
 #include <arpa/inet.h> 
-#define LOCAL_SERVER_PORT 1234
-
 
 void show_help(char *name)
 {
@@ -28,7 +26,7 @@ void parse_arguments(int argc, char **argv)
 	char c;
 	long tmp;
 
-	while ((c = getopt(argc, argv, "ht:u:b")) != -1)
+	while ((c = getopt(argc, argv, "ht:u:bp:")) != -1)
 		switch (c) {
 		case 't':
 			{
@@ -47,17 +45,25 @@ void parse_arguments(int argc, char **argv)
 			{
 				assert(optarg);
 				tmp = atoll(optarg);
-				if (tmp > 5000)
+				if (tmp > 5000) {
 					handle.udp_portnummer =
 					    (unsigned short int)tmp % 65535;
-				else
+					syslog_x(LOG_INFO, "Die udp_portnumber wurde auf %d geändert.\n", handle.udp_portnummer);
+				}
+				else {
 					syslog_x(LOG_CRIT,
 						 "udp_portnumber remains %d (%d not allowed)\n",
 						 handle.udp_portnummer, tmp);
+				}
 				break;
 			}
     case 'b': {
       ///todo set flag - daemon shall NOT run in CONSOLE but in BACKGROUND
+      break;
+    }
+	case 'p': {
+      handle.path = optarg;
+	  syslog_x(LOG_INFO, "Filepath wurde auf %s geändert\n", handle.path);
       break;
     }
 		case 'h':
@@ -76,7 +82,7 @@ int web_init_socket()
 	handle.web_server_socket = socket(PF_INET, SOCK_STREAM, 0);
 
 	serverinfo.sin_family = AF_INET;
-	serverinfo.sin_addr.s_addr = inet_addr("127.0.0.1");	//htonl (INADDR_ANY);
+	serverinfo.sin_addr.s_addr = htonl(INADDR_ANY);	//htonl (INADDR_ANY);
 	serverinfo.sin_port = htons(handle.web_portnummer);
 	setsockopt(handle.web_server_socket, SOL_SOCKET, SO_REUSEADDR, &flag,
 		   sizeof(flag));
@@ -100,6 +106,9 @@ int web_init_socket()
 	return retval;
 }
 
+void beende(int sig) {
+	exit(EXIT_FAILURE);
+}
 
 int udp_init_socket() {
 	int laenge;
@@ -113,6 +122,7 @@ int udp_init_socket() {
 	char puffer[BUFFERSIZE];
 	char bestaetigungsNachricht[] = "SERVER: Habe die Daten erhalten.\n";
 	
+	signal(SIGINT, beende);
 
 	//socket erzeugen
 	handle.udp_peer_socket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -124,7 +134,7 @@ int udp_init_socket() {
 
 	serverinfo.sin_family = AF_INET;
 	serverinfo.sin_addr.s_addr = htonl(INADDR_ANY);	// all network interfaces
-	serverinfo.sin_port = htons(LOCAL_SERVER_PORT); //inital handle.udp_portnummer
+	serverinfo.sin_port = htons(handle.udp_portnummer); //inital handle.udp_portnummer
 	
 	setsockopt(handle.udp_peer_socket, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
 
@@ -150,6 +160,7 @@ int udp_init_socket() {
 	
 	/* Puffer initialisieren */
 	memset (puffer, 0, BUFFERSIZE);
+	
 	/* Nachrichten empfangen */
 	len = sizeof (clientinfo);
 	
@@ -160,7 +171,7 @@ int udp_init_socket() {
 
 	/* Erhaltene Nachricht ausgeben */
 	//Speichere IP-Addressen in struct
-	syslog_x(LOG_INFO, "Anzahl von Argumenten erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
+	syslog_x(LOG_INFO, "Anzahl von IP-Adressen erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
 			ntohs (clientinfo.sin_port), puffer);
 	
 	anzIP = atoi(puffer);
@@ -172,9 +183,9 @@ int udp_init_socket() {
 	
 
 	FILE *fp;
-	fp = fopen("ip.txt", "w");
+	fp = fopen(handle.path, "w");
 
-	getIP(fp);
+	getIP_Port(fp);
 	
 	/* weitere Nachrichten Abfangen */
 	while (anzIP--) {
@@ -192,12 +203,12 @@ int udp_init_socket() {
 		syslog_x(LOG_INFO, "Daten erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
 				ntohs (clientinfo.sin_port), puffer);
 		
+		/* IP-Adresse in Datei speichern */ 
 		n = fprintf(fp, puffer);
 		if(n < 0) {
 			syslog_x(LOG_ALERT, "Fehler beim schreiben in die Datei!\n Beende Programm!");
 			exit(EXIT_FAILURE);
 		}
-		/* IP-Adresse in Datei speichern */ 
 		n = fprintf(fp, "\n");
 		if(n < 0) {
 			syslog_x(LOG_ALERT, "Fehler beim schreiben in die Datei!\n Beende Programm!");
@@ -213,10 +224,11 @@ int udp_init_socket() {
 	return retval;
 }
 
-void getIP(FILE * fp) {
+void getIP_Port(FILE * fp) {
 
     char hostbuffer[256];
 	char * IPBuffer = malloc(11* sizeof(char));
+	char *ownport;
 	int hostname;
 	struct hostent *host_entry;
 
@@ -233,7 +245,11 @@ void getIP(FILE * fp) {
 	
 	IPBuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
     
-	fprintf(fp,IPBuffer);
+	sprintf(ownport, "%d", handle.udp_portnummer);
+
+	fprintf(fp, IPBuffer);
+	fprintf(fp, ":");
+	fprintf(fp, ownport);
 	fprintf(fp, "\n");
 
 }
@@ -248,6 +264,8 @@ int init_everything(int argc, char **argv)
 	handle.web_portnummer = 24473;
 	handle.udp_portnummer = 24473;
 
+	handle.path = "ip.txt";
+
 	parse_arguments(argc, argv); // <-- eventualy override port numbers etc.
 	
 	/* register cleanup function */
@@ -259,10 +277,11 @@ int init_everything(int argc, char **argv)
 	my_signal(SIGALRM, catch_sigalarm);
 
 	/* create an TCP-Socket @ localhost */
+	/*
 	if (0 != web_init_socket()) {
 		return -1;
 	}			// end if failed
-
+	*/
 
 	if (0 != udp_init_socket()) {
 		return -1;
