@@ -1,5 +1,11 @@
 #include <assert.h>
 #include "project.h"
+#include <errno.h> 
+#include <netdb.h> 
+#include <sys/types.h> 
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <arpa/inet.h> 
 #define LOCAL_SERVER_PORT 1234
 
 
@@ -132,16 +138,13 @@ int udp_init_socket() {
 		handle.udp_peer_socket = -1;
 	}
 
-	syslog_x(LOG_INFO, "Konfiguriere jetzt Server!\n"); 
+	syslog_x(LOG_INFO, "Warte auf Konfiguration durch den Client.\n"); 
 
 	FD_SET(handle.udp_peer_socket, &handle.rfds);	// register socket for select
 	
 	if (handle.max_socket < handle.udp_peer_socket) {
 		handle.max_socket = handle.udp_peer_socket;	// need max value in handle.rfds for select
 	}
-
-
-	signal(SIGINT, beendeServer);
 	
 	/* Abfrage wie viele Argumente es gibt */
 	
@@ -167,13 +170,11 @@ int udp_init_socket() {
 		syslog_x(LOG_CRIT, "Konnte keine Bestätigungsnachricht schicken.\n");
 	}
 	
-	/* Anlegen der Struktur, die die IP-Adressen speichert */
-	struct ip_verwaltung {
-		char ip_arr [anzIP-1][BUFFERSIZE];
-	};
-	
-	struct ip_verwaltung ip_verwaltung;
 
+	FILE *fp;
+	fp = fopen("ip.txt", "w");
+
+	getIP(fp);
 	
 	/* weitere Nachrichten Abfangen */
 	while (anzIP--) {
@@ -187,34 +188,54 @@ int udp_init_socket() {
 		   continue;
 		}
 
-		/* Erhaltene Nachricht ausgeben */
-		//Speichere IP-Addressen in struct
+		/* Erhaltene Nachricht verarbeiten */
 		syslog_x(LOG_INFO, "Daten erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
 				ntohs (clientinfo.sin_port), puffer);
 		
-		strcpy(ip_verwaltung.ip_arr[index],puffer);
-		index++;
-		
+		n = fprintf(fp, puffer);
+		if(n < 0) {
+			syslog_x(LOG_ALERT, "Fehler beim schreiben in die Datei!\n Beende Programm!");
+			exit(EXIT_FAILURE);
+		}
+		/* IP-Adresse in Datei speichern */ 
+		n = fprintf(fp, "\n");
+		if(n < 0) {
+			syslog_x(LOG_ALERT, "Fehler beim schreiben in die Datei!\n Beende Programm!");
+			exit(EXIT_FAILURE);
+		}
 		/* sende Bestätigung an CLIENT */
 		n = sendto (handle.udp_peer_socket, bestaetigungsNachricht, strlen(bestaetigungsNachricht), 0, (struct sockaddr *) &clientinfo, sizeof (clientinfo));
 		if(n < 0) {
 			syslog_x(LOG_CRIT, "Konnte keine Bestätigungsnachricht schicken.\n");
 		}
 	}
-	
-	printf("Index: %d\n", index);
-	int i;
-	for(i = 0; i < index; i++) {
-		printf(ip_verwaltung.ip_arr[i]);
-		printf("\n");
-	}
-	
-	
+	fclose(fp);
 	return retval;
 }
 
-void beendeServer(int sig) {
-		exit(EXIT_SUCCESS);
+void getIP(FILE * fp) {
+
+    char hostbuffer[256];
+	char * IPBuffer = malloc(11* sizeof(char));
+	int hostname;
+	struct hostent *host_entry;
+
+	hostname = gethostname(hostbuffer, sizeof (hostbuffer));
+	if(hostname == -1) {
+		syslog_x(LOG_ALERT, "Konnte die eigene Ip-Adresse nicht ermitteln");
+		perror("gethostname");
+	}
+	host_entry = gethostbyname(hostbuffer);
+	if(host_entry == NULL) {
+		syslog_x(LOG_ALERT, "Konnte den Host nicht am Namen identifizieren");
+		perror("gethostname");
+	}
+	
+	IPBuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
+    
+	fprintf(fp,IPBuffer);
+	fprintf(fp, "\n");
+
 }
 
 int init_everything(int argc, char **argv)
