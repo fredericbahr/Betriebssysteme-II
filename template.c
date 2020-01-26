@@ -11,12 +11,15 @@ int main(int argc, char **argv){
 
 // START WORKING
 	sleep(5);
+	syslog_x(LOG_INFO, "Sende jetzt die Linkstate Pakete an Nachbarn.\n");
 	sendInitialLSP();
 	getMessages();
 	do {
 
 		// call functions
 		//worker();
+		getMessages();
+		sleep(5);
 
 	} while ((1 == get_sigint_state()) && (1 == get_sigterm_state()));
 
