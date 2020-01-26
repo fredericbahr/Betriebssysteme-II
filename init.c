@@ -113,12 +113,11 @@ void beende(int sig) {
 
 int udp_init_socket() {
 	int laenge;
-	int len;
+	socklen_t len;
 	int retval = 0;
 	int n;
 	int flag = 1;
 	int anzIP = 0;
-	int index = 0;
 	struct sockaddr_in serverinfo, clientinfo;
 	char puffer[BUFFERSIZE];
 	char bestaetigungsNachricht[] = "SERVER: Habe die Daten erhalten.\n";
@@ -186,7 +185,7 @@ int udp_init_socket() {
 	FILE *fp;
 	fp = fopen(handle.path, "w");
 
-	getIP_Port(fp);
+	getOwnIP_Port(fp);
 	
 	/* weitere Nachrichten Abfangen */
 	while (anzIP--) {
@@ -201,6 +200,7 @@ int udp_init_socket() {
 		}
 
 		/* Erhaltene Nachricht verarbeiten */
+		
 		syslog_x(LOG_INFO, "Daten erhalten von %s an Port %u : %s \n", inet_ntoa (clientinfo.sin_addr),
 				ntohs (clientinfo.sin_port), puffer);
 		
@@ -225,7 +225,7 @@ int udp_init_socket() {
 	return retval;
 }
 
-void getIP_Port(FILE * fp) {
+void getOwnIP_Port(FILE * fp) {
 
     char hostbuffer[256];
 	char * IPBuffer = malloc(11* sizeof(char));
