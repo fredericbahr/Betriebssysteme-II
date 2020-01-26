@@ -20,8 +20,8 @@ void beende(int sig) {
 void show_help(char *name)
 {
 	fprintf(stderr,"Usage HINTS for %s\n", name);
-    fprintf(stderr,"%s 127.0.0.1:24473 141.57.9.22:24474 141.57.9.33:24475 \n", name);
-	fprintf(stderr,"Der Aufbau der Argumente ist relative einfach.\n");
+    fprintf(stderr,"%s 127.0.0.1 24473 141.57.9.22:24474 141.57.9.33:24475 \n", name);
+	fprintf(stderr,"Der Aufbau der Argumente für die Nachbarn ist relative einfach.\n");
 	fprintf(stderr,"Sie folgen der Form ip_adresse:portnummer.\n");
 	fprintf(stderr,"Das erste Argument ist für den interen Server-Sockeet gedacht, ");
 	fprintf(stderr,"daher sollte dieser immer die IP-Adresse des localhsot haben.\n");
@@ -48,7 +48,7 @@ int main (int argc, char **argv) {
 	/* Kommandozeile auswerten */
 	if(argc < 3) {
 		printf ("Sie müssen mindestens eine IP-Addresse Ihres Nachbarns angeben\n");
-		showhelp(argv[0]);
+		show_help(argv[0]);
 	}
 	/* IP-Adresse vom Server überprüfen */
 	h = gethostbyname (argv[1]);
