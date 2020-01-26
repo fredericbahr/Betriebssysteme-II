@@ -40,3 +40,19 @@ void cleanup(void);
 int worker();
 
 void beendeServer();
+
+void beende(int sig);
+
+void newNeighbors();
+
+int sende_lsp(char *dest, unsigned short int port, char *nachricht);
+
+char * readWholeFile();
+
+void sendInitialLSP();
+
+void resendIncomingLSP(struct sockaddr_in neighborinfo);
+
+void getMessages();
+
+void getOwnIP_Port(FILE * fp);
