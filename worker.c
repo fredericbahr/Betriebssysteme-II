@@ -1,5 +1,6 @@
 #include "project.h"
 
+
 /*
  * test with nc 127.0.0.1 24473
  * */
@@ -47,26 +48,20 @@ int worker_new_udp_request() {
 		memcpy(handle.lastmsg,buffer,1+retval);
 	}	
 
-	// echo that
-	syslog_x(LOG_INFO, buffer);
-	retval = sendto (handle.udp_peer_socket, buffer, 1+ retval , 0, (struct sockaddr *) &clientinfo, sizeof (clientinfo)); 
-  
-  
-	if (1 > retval){
-		syslog_x(LOG_CRIT, "returning msg not successfull udp_peer\n");
-		return -1;
-	}
 	return 0;
 }
 /*
  * 
  * */
-int sende_lsp(char *dest, unsigned short int port, char *nachricht)
-{
+
+void noNewNeighbors() {
+	exit(EXIT_FAILURE);
+}
+
+
+int sende_lsp(char *dest, unsigned short int port, char *nachricht) {
 	int retval = 0;
-	socklen_t len;
 	struct sockaddr_in clientinfo;
-	char buffer[BUFFERSIZE];
 
 	clientinfo.sin_family = AF_INET;
 	clientinfo.sin_addr.s_addr = inet_addr(dest);	//htonl (INADDR_ANY);
@@ -101,7 +96,6 @@ char * readWholeFile() {
 
 void sendInitialLSP() {
 	FILE *fp;
-	char puffer[100];
 	char ip[100];
 	char port[100];
 	int dontSendFirstLine = 1;
@@ -125,21 +119,99 @@ void sendInitialLSP() {
 	
 }
 
-getMessages() {
-	struct sockaddr_in neighborinfo, serverinfo;
-	int n, len;
-	char puffer[BUFFERSIZE];
 
-	serverinfo.sin_family = AF_INET;
-	serverinfo.sin_addr.s_addr = htonl(INADDR_ANY);	// all network interfaces
-	serverinfo.sin_port = htons(handle.udp_portnummer);
+void resendIncomingLSP(struct sockaddr_in neighborinfo) {
+	FILE *fp;
+	char ip[100];
+	char port[100];
+	int dontSendFirstLine = 1;
+	char *nachricht;
+	char neighborip[100];
+	char neighborport[100];
+
+	nachricht = readWholeFile();
+
+	strcpy(neighborip, inet_ntoa(neighborinfo.sin_addr));
+	sprintf(neighborport, "%u", ntohs(neighborinfo.sin_port));
+
+	fp = fopen(handle.path, "r");
+
+	while (fscanf(fp, "%[^:]%*c%[^\n]%*c", ip, port) != EOF)
+	{
+		if(!(dontSendFirstLine >= 1)) {
+			if( (neighborip != ip) && (neighborport != port) ) {
+				syslog_x(LOG_INFO, "Sende an %s über Port %s\n", ip, port);
+				sende_lsp(ip, atoi(port), nachricht);
+			}
+		}
+		else
+		{
+			dontSendFirstLine--;
+		}
+		
+	}
+}
+
+void getMessages() {
+	struct sockaddr_in neighborinfo;
+	socklen_t len;
+	int isequal = 1;
+	int neuerNachbar = 0;
+	int n;
+	char puffer[BUFFERSIZE];
+	FILE *fp;
+	char * pufferline;
+	char fileline[100];
 
 	len = sizeof (neighborinfo);
 
+	syslog_x(LOG_INFO, "Versuche jetzt Nachrichten zu erhalten.\n");
 	n = recvfrom ( handle.udp_peer_socket, puffer, BUFFERSIZE, 0, (struct sockaddr *) &neighborinfo, &len );
 
 	syslog_x(LOG_INFO, "Nachricht:\n%swurde von %s an Port %u erhalten.\n",
 	puffer, inet_ntoa(neighborinfo.sin_addr), ntohs(neighborinfo.sin_port));
+	
+	fp = fopen(handle.path, "a+");
+	
+	if (fp == NULL) {
+		syslog_x(LOG_CRIT, "Konnte die Datei nicht öffnen.\n");
+	}
+
+	pufferline =strtok(puffer, "\n");
+
+	while(pufferline != NULL) {
+
+		while (fscanf(fp, "%[^\n]%*c", fileline) != EOF)
+		{
+			if(strcmp(fileline, pufferline) == 0) {
+				isequal = 1;
+				break;
+			} else
+			{
+				isequal = 0;
+			}			
+		}
+		
+		fseek(fp, 0L, SEEK_SET);
+
+		if(isequal == 0) {
+			syslog_x(LOG_INFO, "Schreibe jetzt %s n die Datei %s.\n", pufferline, handle.path);
+			neuerNachbar = 1;
+			isequal = 1;
+			fprintf(fp, pufferline);
+			fprintf(fp, "\n");
+		}
+
+        pufferline = strtok(NULL, "\n");
+    }
+	fclose(fp);
+
+	if(neuerNachbar == 0) {
+		syslog_x(LOG_INFO, "Es wurden keine neuen Nachbarn hinzugefügt. Beende das Programm.\n");
+		noNewNeighbors();
+	}
+
+	resendIncomingLSP(neighborinfo);
 }
 
 int worker()
@@ -152,6 +224,7 @@ int worker()
 	tv.tv_usec = 0;
 	// copy global bitvector into local copy
 	memcpy(&rfds, &handle.rfds, sizeof(fd_set));
+
 	//fprintf(stderr,"worker before select %d\n",retval);
 	retval = select(handle.max_socket + 1, &rfds, NULL, NULL, &tv);
 	//fprintf(stderr,"worker after select %d\n",retval);
